@@ -1,0 +1,5 @@
+# WorkBuddy 项目数据，不入库
+.workbuddy/
+.probe.txt
+Thumbs.db
+.DS_Store
