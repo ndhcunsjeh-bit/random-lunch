@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ff6a3d">
+<title>随机吃什么 · 今天吃啥不纠结</title>
+<style>
+/* ============================================================
+   1. 设计变量（浅色 / 深色两套，靠 html[data-theme] 切换）
+   ============================================================ */
+:root{
+  --row: 84px;                     /* 转盘单行高度，JS 会读取这个变量 */
+  --accent: #ff5f45;
+  --accent-2: #ff9f1c;
+  --accent-soft: rgba(255,95,69,.10);
+  --accent-line: rgba(255,95,69,.32);
+  --bg: #f4f5fa;
+  --bar: rgba(244,245,250,.80);
+  --bg-glow: radial-gradient(1000px 520px at 12% -8%, #ffe7dd 0%, transparent 62%),
+             radial-gradient(760px 460px at 100% 0%, #e6efff 0%, transparent 58%);
+  --panel: #ffffff;
+  --panel-2: #fafbfe;
+  --wheel-bg: linear-gradient(180deg,#fff 0%, #f7f8fc 100%);
+  --text: #171a21;
+  --muted: #6b7280;
+  --line: #e8eaf0;
+  --shadow: 0 10px 30px rgba(24,28,45,.07), 0 2px 6px rgba(24,28,45,.04);
+  --shadow-lg: 0 24px 60px rgba(24,28,45,.16);
+  --danger: #e5484d;
+  --ok: #17a673;
+}
+html[data-theme="dark"]{
+  --accent: #ff7a5c;
+  --accent-2: #ffb454;
+  --accent-soft: rgba(255,122,92,.14);
+  --accent-line: rgba(255,122,92,.38);
+  --bg: #0e1014;
+  --bar: rgba(14,16,20,.80);
+  --bg-glow: radial-gradient(1000px 520px at 12% -8%, #2a1a17 0%, transparent 62%),
+             radial-gradient(760px 460px at 100% 0%, #16202e 0%, transparent 58%);
+  --panel: #171a20;
+  --panel-2: #1c2028;
+  --wheel-bg: linear-gradient(180deg,#1e222a 0%, #171a20 100%);
+  --text: #e9ecf1;
+  --muted: #99a1b0;
+  --line: #272c36;
+  --shadow: 0 10px 30px rgba(0,0,0,.38), 0 2px 6px rgba(0,0,0,.3);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+  --danger: #ff6b6f;
+  --ok: #35d39a;
+}
+
+/* ============================================================
+   2. 基础样式
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  background-image:var(--bg-glow);
+  background-attachment:fixed;
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  transition:background-color .25s ease,color .25s ease;
+  padding-bottom:40px;
+}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.hidden{display:none !important}
+.muted{color:var(--muted)}
+.container{max-width:1060px;margin:0 auto;padding:0 16px}
+
+/* 顶栏 */
+.appbar{position:sticky;top:0;z-index:40;backdrop-filter:saturate(180%) blur(14px);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  background:var(--bar);border-bottom:1px solid var(--line)}
+.appbar-inner{max-width:1060px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-emoji{font-size:26px;line-height:1;filter:drop-shadow(0 4px 10px rgba(255,95,69,.35))}
+.brand h1{font-size:17px;font-weight:800;letter-spacing:.2px}
+.brand-sub{font-size:11.5px;color:var(--muted);margin-top:-2px}
+.icon-btn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:17px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);transition:transform .15s,background .15s}
+.icon-btn:hover{transform:translateY(-1px)}
+.icon-btn:active{transform:scale(.96)}
+
+/* 面板 */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);
+  padding:18px;margin-top:16px}
+.panel-picker{margin-top:20px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.panel-head h2{font-size:16px;font-weight:800}
+.counter{font-size:12px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);
+  padding:4px 10px;border-radius:999px;white-space:nowrap}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:10px 16px;border-radius:13px;font-weight:700;font-size:14px;
+  border:1px solid transparent;transition:transform .14s ease,box-shadow .18s ease,opacity .15s,background .18s;
+  white-space:nowrap;user-select:none}
+.btn:active{transform:scale(.975)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-primary{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  box-shadow:0 8px 20px rgba(255,95,69,.30)}
+.btn-primary:hover{box-shadow:0 12px 26px rgba(255,95,69,.40)}
+.btn-ghost{background:var(--panel-2);border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{background:var(--accent-soft);border-color:var(--accent-line)}
+.btn-danger{color:#fff;background:linear-gradient(135deg,#ff6b6f,#e5484d)}
+.btn-sm{padding:8px 13px;font-size:13px;border-radius:11px}
+.btn-hero{width:100%;padding:17px 20px;font-size:17px;border-radius:18px;letter-spacing:.5px;
+  color:#fff;background:linear-gradient(120deg,var(--accent) 0%,var(--accent-2) 100%);
+  box-shadow:0 14px 34px rgba(255,95,69,.34)}
+.btn-hero span{font-size:20px}
+.btn-hero:hover{box-shadow:0 18px 40px rgba(255,95,69,.44);transform:translateY(-1px)}
+.btn-hero:disabled{transform:none}
+.link-btn{font-size:12.5px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.link-btn:hover{color:var(--accent)}
+
+/* 转盘 */
+.wheel-wrap{position:relative;height:calc(var(--row) * 3);overflow:hidden;border-radius:18px;
+  background:var(--wheel-bg);border:1px solid var(--line);margin-bottom:16px;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 78%,transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 78%,transparent 100%)}
+.wheel-band{position:absolute;left:8px;right:8px;top:var(--row);height:var(--row);border-radius:14px;
+  background:var(--accent-soft);border:1px solid var(--accent-line);z-index:0}
+.wheel{position:relative;z-index:1;will-change:transform}
+.wheel-row{height:var(--row);display:flex;align-items:center;gap:12px;padding:0 16px}
+.wr-thumb{width:46px;height:46px;border-radius:12px;overflow:hidden;flex:0 0 46px;background:var(--panel-2)}
+.wr-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.wr-text{min-width:0}
+.wr-text b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr-text span{font-size:11.5px;color:var(--muted)}
+
+/* 结果大卡片 */
+.result{border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--panel-2);
+  box-shadow:var(--shadow-lg);opacity:0;transform:translateY(14px) scale(.97);
+  transition:opacity .38s ease,transform .38s cubic-bezier(.2,.9,.25,1);margin-bottom:14px}
+.result.show{opacity:1;transform:none}
+.result-media{position:relative;aspect-ratio:4/3;background:var(--panel-2)}
+.result-media img{width:100%;height:100%;object-fit:cover;display:block}
+.result-body{padding:16px 18px 18px;text-align:center}
+.result-label{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:1.6px;
+  color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);
+  padding:4px 11px;border-radius:999px;margin-bottom:10px}
+.result-name{font-size:28px;font-weight:900;letter-spacing:.5px;line-height:1.25;word-break:break-word}
+.result-cat{margin-top:7px;font-size:13px;color:var(--muted)}
+.result-actions{display:flex;gap:10px;margin-top:16px}
+.result-actions .btn{flex:1}
+
+/* 图片兜底（加载失败 / 无图）：菜名首字 + 淡色背景 */
+.fallback{position:absolute;inset:0;display:grid;place-items:center;font-weight:900;letter-spacing:2px;
+  font-size:26px;text-align:center;padding:8px;word-break:break-word}
+.result-media .fallback{font-size:40px}
+
+/* 提示 / 历史 / 排除条 */
+.picker-tip{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px}
+.excluded-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;
+  padding:10px 12px;border-radius:14px;background:var(--accent-soft);border:1px dashed var(--accent-line);font-size:12.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line);font-size:12px}
+.history-wrap{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}
+.section-sub{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:1.2px;margin-bottom:9px}
+.history{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.hist-item{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:13px;
+  background:var(--panel-2);border:1px solid var(--line);font-size:12.5px}
+.hist-item .hi-img{width:30px;height:30px;border-radius:9px;overflow:hidden;background:var(--panel);flex:0 0 30px;position:relative}
+.hist-item .hi-img img{width:100%;height:100%;object-fit:cover;display:block}
+.hist-item b{font-weight:700}
+.hist-item small{display:block;color:var(--muted);font-size:10.5px}
+
+/* 清单工具条 */
+.tools{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.search{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:14px;padding:9px 13px}
+.search span{font-size:14px;opacity:.6}
+.search input{flex:1;border:0;background:none;outline:none;font-size:14px;min-width:0}
+.cats{display:flex;gap:7px;flex-wrap:wrap}
+.cat-chip{padding:6px 13px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);
+  font-size:12.5px;font-weight:600;color:var(--muted);transition:.16s}
+.cat-chip:hover{border-color:var(--accent-line);color:var(--text)}
+.cat-chip.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+  border-color:transparent;box-shadow:0 6px 16px rgba(255,95,69,.28)}
+
+/* 卡片网格 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{position:relative;border-radius:17px;overflow:hidden;background:var(--panel-2);
+  border:1px solid var(--line);box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(24,28,45,.13)}
+.card-media{position:relative;aspect-ratio:4/3;background:var(--panel)}
+.card-media img{width:100%;height:100%;object-fit:cover;display:block}
+.card-body{padding:9px 11px 11px}
+.card-name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-cat{display:inline-block;margin-top:5px;font-size:10.5px;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.card-del{position:absolute;top:7px;right:7px;width:27px;height:27px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(0,0,0,.5);color:#fff;font-size:13px;backdrop-filter:blur(6px);opacity:0;transition:opacity .18s}
+.card:hover .card-del,.card:focus-within .card-del{opacity:1}
+@media (hover:none){.card-del{opacity:1}}
+.card-del:hover{background:var(--danger)}
+.badge-preset{position:absolute;top:7px;left:7px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;
+  background:rgba(255,255,255,.86);color:#8a5a00;backdrop-filter:blur(6px)}
+html[data-theme="dark"] .badge-preset{background:rgba(0,0,0,.5);color:#ffc86b}
+
+/* 空状态 */
+.empty{text-align:center;padding:26px 14px 30px}
+.empty .em{font-size:40px}
+.empty h3{margin-top:8px;font-size:16.5px}
+.empty p{color:var(--muted);font-size:13px;margin-top:6px}
+.steps{display:flex;flex-direction:column;gap:8px;margin:16px auto 18px;max-width:330px;text-align:left}
+.step{display:flex;gap:10px;align-items:flex-start;font-size:13px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:13px;padding:10px 12px}
+.step i{flex:0 0 20px;height:20px;border-radius:7px;display:grid;place-items:center;font-style:normal;
+  font-size:11px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+.empty-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* 存储用量 */
+.storage{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}
+.storage-bar{height:6px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.storage-bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .3s ease}
+.storage-bar.warn i{background:linear-gradient(90deg,#ffb454,#e5484d)}
+.storage-text{display:block;margin-top:7px;font-size:11.5px;color:var(--muted)}
+.io-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+
+/* 弹窗 */
+.modal{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.modal.hidden{display:none}
+.modal-mask{position:absolute;inset:0;background:rgba(12,14,20,.5);backdrop-filter:blur(3px);
+  animation:fade .2s ease}
+.modal-card{position:relative;width:100%;max-width:520px;max-height:92vh;overflow:auto;
+  background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;
+  box-shadow:var(--shadow-lg);animation:slideUp .28s cubic-bezier(.2,.9,.25,1)}
+.modal-sm{max-width:380px;border-radius:20px;margin:auto;align-self:center;padding:20px}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+.modal-head h3{font-size:16px;font-weight:800}
+.modal-body{padding:16px 18px}
+.modal-body .field+.field{margin-top:16px}
+.modal-foot{display:flex;gap:10px;padding:14px 18px calc(16px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--panel-2);position:sticky;bottom:0}
+.modal-foot .btn{flex:1}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(28px);opacity:.6}to{transform:none;opacity:1}}
+@media (min-width:640px){
+  .modal{align-items:center}
+  .modal-card{border-radius:22px;max-height:88vh}
+  .modal-foot{padding-bottom:16px}
+}
+
+/* 表单 */
+.field-label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:7px}
+.field-label em{color:var(--accent);font-style:normal}
+.field input[type=text],.field input[type=url]{width:100%;padding:11px 13px;border-radius:13px;
+  border:1px solid var(--line);background:var(--panel-2);outline:none;font-size:14.5px;transition:border-color .15s,box-shadow .15s}
+.field input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.field input.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(229,72,77,.14)}
+.field-err{display:block;font-size:11.5px;color:var(--danger);margin-top:5px;min-height:15px}
+.quick-cats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.quick-cats button{font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px dashed var(--line);color:var(--muted)}
+.quick-cats button:hover{border-color:var(--accent-line);color:var(--accent)}
+.tabs{display:flex;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:10px}
+.tab{flex:1;padding:8px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted)}
+.tab.active{background:var(--panel);color:var(--text);box-shadow:var(--shadow)}
+.dropzone{display:block;border:1.5px dashed var(--line);border-radius:14px;background:var(--panel-2);
+  padding:20px 14px;text-align:center;font-size:13px;transition:.18s;cursor:pointer}
+.dropzone:hover,.dropzone.over{border-color:var(--accent-line);background:var(--accent-soft)}
+.dropzone small{color:var(--muted);font-size:11.5px}
+.dropzone b{color:var(--accent)}
+.preview{display:flex;align-items:center;gap:12px;margin-top:16px;padding:10px;border-radius:14px;
+  background:var(--panel-2);border:1px solid var(--line)}
+.preview-img{position:relative;width:62px;height:62px;border-radius:12px;overflow:hidden;flex:0 0 62px;background:var(--panel)}
+.preview-img img{width:100%;height:100%;object-fit:cover;display:block}
+.preview-img .fallback{font-size:18px}
+.preview-meta{flex:1;font-size:11.5px;color:var(--muted);word-break:break-all}
+#confirmModal .modal-card h3{font-size:16px;font-weight:800}
+#cfMsg{margin-top:8px;font-size:13.5px;color:var(--muted);line-height:1.6}
+
+/* 轻提示 */
+#toastWrap{position:fixed;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));z-index:120;
+  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
+.toast{max-width:92%;background:var(--text);color:var(--bg);font-size:13px;font-weight:600;
+  padding:10px 16px;border-radius:13px;box-shadow:var(--shadow-lg);animation:toastIn .26s ease}
+.toast.err{background:var(--danger);color:#fff}
+.toast.ok{background:var(--ok);color:#fff}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* 移动端微调 */
+@media (max-width:560px){
+  .panel{padding:15px;border-radius:19px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px}
+  .result-name{font-size:24px}
+  .btn-hero{padding:16px;font-size:16px}
+  .brand-sub{display:none}
+}
+@media (min-width:900px){
+  .panel-picker .wheel-wrap{max-width:520px;margin-left:auto;margin-right:auto}
+  .result{max-width:520px;margin-left:auto;margin-right:auto}
+  .btn-hero{max-width:520px;margin:0 auto;display:flex}
+  .picker-tip{max-width:520px;margin-left:auto;margin-right:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 顶栏 ========== -->
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <span class="brand-emoji">🍜</span>
+      <div>
+        <h1>随机吃什么</h1>
+        <p class="brand-sub">别纠结了，交给运气</p>
+      </div>
+    </div>
+    <button id="themeBtn" class="icon-btn" aria-label="切换深色 / 浅色">🌙</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ========== 抽取区 ========== -->
+  <section class="panel panel-picker">
+    <div class="panel-head">
+      <h2>今天吃点什么？</h2>
+      <span class="counter" id="poolCounter">可选 0 道</span>
+    </div>
+
+    <!-- 转盘（滚动抽选，减速停止） -->
+    <div class="wheel-wrap hidden" id="wheelWrap">
+      <div class="wheel-band"></div>
+      <div class="wheel" id="wheel"></div>
+    </div>
+
+    <!-- 结果大卡片 -->
+    <div class="result hidden" id="result" aria-live="polite">
+      <div class="result-media">
+        <img id="resultImg" alt="抽中的食物">
+        <div class="fallback hidden" id="resultFallback"></div>
+      </div>
+      <div class="result-body">
+        <div class="result-label">就决定是你了</div>
+        <div class="result-name" id="resultName">—</div>
+        <div class="result-cat" id="resultCat">—</div>
+        <div class="result-actions">
+          <button class="btn btn-primary" id="swapBtn">换一批</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-hero" id="rollBtn"><span>🎲</span> 随机一餐</button>
+    <p class="picker-tip" id="pickerTip">还没有食物，先去下面的清单添加吧</p>
+
+    <div class="excluded-bar hidden" id="excludedBar">
+      <strong>本次已排除</strong>
+      <div class="chips" id="excludedList"></div>
+      <button class="link-btn" id="restoreAll">全部恢复</button>
+    </div>
+
+    <div class="history-wrap">
+      <div class="section-sub">最近抽到</div>
+      <div class="history" id="history"><span class="muted" style="font-size:12.5px">还没有记录，先抽一次吧</span></div>
+    </div>
+  </section>
+
+  <!-- ========== 清单区 ========== -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>我的食物清单 <span class="counter" id="dishCount">0 道</span></h2>
+      <button class="btn btn-primary btn-sm" id="openAdd">＋ 添加食物</button>
+    </div>
+
+    <div class="tools">
+      <div class="search">
+        <span>🔍</span>
+        <input id="searchInput" type="search" placeholder="搜索菜名…" autocomplete="off">
+      </div>
+      <div class="cats" id="catChips"></div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <!-- 空清单提示 -->
+    <div class="empty hidden" id="empty">
+      <div class="em">🍽️</div>
+      <h3>清单还是空的</h3>
+      <p>加几道你常吃的，之后让运气替你决定</p>
+      <div class="steps">
+        <div class="step"><i>1</i><span>点右上角「＋ 添加食物」</span></div>
+        <div class="step"><i>2</i><span>填菜名，类别可自定义（家常菜 / 面食 / 快餐 / 饮品 / 小吃…）</span></div>
+        <div class="step"><i>3</i><span>传一张图：本地上传会自动压缩，也可以直接粘贴图片链接</span></div>
+      </div>
+      <div class="empty-actions">
+        <button class="btn btn-primary" id="emptyAdd">＋ 添加第一道菜</button>
+        <button class="btn btn-ghost" id="restorePresets">恢复示例菜</button>
+      </div>
+    </div>
+
+    <!-- 本地存储用量 -->
+    <div class="storage">
+      <div class="storage-bar" id="storageBar"><i id="storageFill"></i></div>
+      <span class="storage-text" id="storageText">清单保存在本机浏览器（localStorage），不会上传</span>
+    </div>
+
+    <div class="io-actions">
+      <button class="btn btn-ghost btn-sm" id="exportBtn">导出清单</button>
+      <button class="btn btn-ghost btn-sm" id="importBtn">导入清单</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <button class="btn btn-ghost btn-sm" id="clearBtn" style="color:var(--danger)">清空全部</button>
+    </div>
+  </section>
+
+  <p class="muted" style="text-align:center;font-size:11.5px;margin-top:16px">
+    数据只存在你自己的浏览器里 · 换设备可用「导出 / 导入」迁移
+  </p>
+</main>
+
+<!-- ========== 添加食物弹窗 ========== -->
+<div class="modal hidden" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="addTitle">添加食物</h3>
+      <button class="icon-btn" data-close aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="field-label" for="fName">菜名 <em>*</em></label>
+        <input id="fName" type="text" maxlength="24" placeholder="例如：番茄炒蛋" autocomplete="off">
+        <span class="field-err" id="errName"></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="fCat">类别 <span class="muted" style="font-weight:400">（可自定义）</span></label>
+        <input id="fCat" type="text" maxlength="10" list="catOptions" placeholder="家常菜 / 面食 / 快餐 / 饮品 / 小吃…" autocomplete="off">
+        <datalist id="catOptions"></datalist>
+        <div class="quick-cats" id="quickCats"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">图片 <span class="muted" style="font-weight:400">（可选，没有就用色块 + 菜名代替）</span></span>
+        <div class="tabs">
+          <button class="tab active" data-tab="file" type="button">上传本地图片</button>
+          <button class="tab" data-tab="url" type="button">粘贴图片链接</button>
+        </div>
+        <div class="tab-pane" data-pane="file">
+          <label class="dropzone" id="dropzone">
+            <input type="file" id="fFile" accept="image/*" hidden>
+            <div>📷<br><b>点击选择</b> 或把图片拖到这里<br><small>自动压缩到 900px 以内再存本地，不占空间</small></div>
+          </label>
+        </div>
+        <div class="tab-pane hidden" data-pane="url">
+          <input id="fUrl" type="url" placeholder="https://…/food.jpg" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="preview-img">
+          <img id="previewImg" alt="">
+          <div class="fallback hidden" id="previewFallback"></div>
+        </div>
+        <div class="preview-meta" id="previewMeta">还没有选择图片，将使用菜名生成的色块占位</div>
+        <button class="link-btn" id="clearImg" type="button">清除</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close type="button">取消</button>
+      <button class="btn btn-primary" id="saveDish" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 确认弹窗 ========== -->
+<div class="modal hidden" id="confirmModal" role="dialog" aria-modal="true">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card modal-sm">
+    <h3 id="cfTitle">确认操作</h3>
+    <p id="cfMsg"></p>
+    <div class="modal-foot" style="border:0;background:none;padding:18px 0 0">
+      <button class="btn btn-ghost" id="cfNo" type="button">取消</button>
+      <button class="btn btn-danger" id="cfYes" type="button">确认</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap"></div>
+
+<script>
+/* ============================================================================
+   随机吃什么 · 单文件实现
+   结构：常量 → 存储 → 工具函数 → 渲染 → 抽取动画 → 事件绑定 → 初始化
+   所有状态都在内存 state 里，任何修改后调 save() 落盘 localStorage
+   ============================================================================ */
+(function () {
+  'use strict';
+
+  /* ---------------- 常量 ---------------- */
+
+  var LS_DISHES  = 'rmce.dishes.v1';    // 食物清单
+  var LS_HISTORY = 'rmce.history.v1';   // 抽取历史
+  var LS_THEME   = 'rmce.theme.v1';     // 主题
+  var SS_EXCLUDED= 'rmce.excluded.v1';  // 本次会话被排除的菜（sessionStorage）
+
+  var MAX_HISTORY   = 8;                // 历史最多保留条数
+  var RECENT_BLOCK  = 3;                // 最近 N 次抽到的菜会被降权，避免短时间重复
+  var STORAGE_LIMIT = 5 * 1024 * 1024;  // 浏览器 localStorage 常见上限约 5MB
+  var WARN_RATIO    = 0.7;              // 用量超过 70% 就提示
+  var IMG_MAX_SIDE  = 900;              // 主图最长边
+  var THUMB_MAX_SIDE= 320;              // 缩略图最长边（网格 / 转盘用，省内存）
+
+  // 预置示例菜：图片用固定图库地址，不占用本地存储
+  var PRESETS = [
+    { id:'preset-ramen', name:'日式拉面',   category:'面食',
+      img:'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=75',
+      thumb:'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=320&q=60' },
+    { id:'preset-pizza', name:'玛格丽特披萨', category:'快餐',
+      img:'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=900&q=75',
+      thumb:'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=320&q=60' },
+    { id:'preset-burger', name:'汉堡 + 薯条', category:'快餐',
+      img:'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=900&q=75',
+      thumb:'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=320&q=60' },
+    { id:'preset-dumpling', name:'蒸饺', category:'小吃',
+      img:'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=900&q=75',
+      thumb:'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=320&q=60' },
+    { id:'preset-salad', name:'轻食沙拉', category:'轻食',
+      img:'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=75',
+      thumb:'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=320&q=60' }
+  ];
+
+  var SUGGEST_CATS = ['家常菜','面食','快餐','饮品','小吃','轻食','汤羹','甜点','外卖'];
+
+  /* ---------------- 状态 ---------------- */
+
+  var state = {
+    dishes: [],       // {id,name,category,img,thumb,preset}
+    history: [],      // {id,name,category,img,t}
+    excluded: [],     // 本次被临时排除的 dish id
+    filterCat: 'ALL',
+    keyword: ''
+  };
+
+  var spinning = false;   // 动画中，防重复点击
+
+  /* ---------------- DOM 引用 ---------------- */
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = {
+    themeBtn: $('themeBtn'),
+    wheelWrap: $('wheelWrap'), wheel: $('wheel'),
+    result: $('result'), resultImg: $('resultImg'), resultFallback: $('resultFallback'),
+    resultName: $('resultName'), resultCat: $('resultCat'),
+    rollBtn: $('rollBtn'), swapBtn: $('swapBtn'),
+    poolCounter: $('poolCounter'), pickerTip: $('pickerTip'),
+    excludedBar: $('excludedBar'), excludedList: $('excludedList'), restoreAll: $('restoreAll'),
+    history: $('history'),
+    dishCount: $('dishCount'), grid: $('grid'), empty: $('empty'),
+    searchInput: $('searchInput'), catChips: $('catChips'),
+    openAdd: $('openAdd'), emptyAdd: $('emptyAdd'), restorePresets: $('restorePresets'),
+    storageBar: $('storageBar'), storageFill: $('storageFill'), storageText: $('storageText'),
+    exportBtn: $('exportBtn'), importBtn: $('importBtn'), importFile: $('importFile'), clearBtn: $('clearBtn'),
+    addModal: $('addModal'), fName: $('fName'), fCat: $('fCat'), errName: $('errName'),
+    catOptions: $('catOptions'), quickCats: $('quickCats'),
+    fFile: $('fFile'), fUrl: $('fUrl'), dropzone: $('dropzone'),
+    previewImg: $('previewImg'), previewFallback: $('previewFallback'), previewMeta: $('previewMeta'),
+    clearImg: $('clearImg'), saveDish: $('saveDish'),
+    confirmModal: $('confirmModal'), cfTitle: $('cfTitle'), cfMsg: $('cfMsg'),
+    cfYes: $('cfYes'), cfNo: $('cfNo'), toastWrap: $('toastWrap')
+  };
+
+  /* ---------------- 小工具 ---------------- */
+
+  function uid() {
+    return 'd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
+    });
+  }
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  // 由菜名生成稳定的色相，用于图片缺失时的淡色底
+  function hueOf(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+  }
+  // 给「没有图 / 图挂了」的元素套上淡色背景 + 菜名首字
+  function paintFallback(node, name) {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var h = hueOf(name || '?');
+    node.style.background = dark
+      ? 'hsl(' + h + ',32%,22%)'
+      : 'hsl(' + h + ',72%,90%)';
+    node.style.color = dark
+      ? 'hsl(' + h + ',70%,80%)'
+      : 'hsl(' + h + ',52%,34%)';
+    node.textContent = (name || '?').slice(0, 2);
+  }
+  // 图片兜底：正常显示 img；加载失败或没有地址就显示 fallback
+  function setMedia(imgEl, fbEl, dish, preferThumb) {
+    var src = preferThumb ? (dish.thumb || dish.img) : (dish.img || dish.thumb);
+    fbEl.classList.add('hidden');
+    imgEl.classList.remove('hidden');
+    imgEl.onerror = function () {
+      imgEl.classList.add('hidden');
+      fbEl.classList.remove('hidden');
+      paintFallback(fbEl, dish.name);
+    };
+    if (!src) {
+      imgEl.removeAttribute('src');
+      imgEl.dispatchEvent(new Event('error'));
+      return;
+    }
+    imgEl.src = src;
+  }
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function toast(msg, type) {
+    var d = document.createElement('div');
+    d.className = 'toast' + (type ? ' ' + type : '');
+    d.textContent = msg;
+    el.toastWrap.appendChild(d);
+    setTimeout(function () {
+      d.style.transition = 'opacity .25s,transform .25s';
+      d.style.opacity = '0';
+      d.style.transform = 'translateY(8px)';
+      setTimeout(function () { d.remove(); }, 260);
+    }, type === 'err' ? 3200 : 2200);
+  }
+  function relTime(ts) {
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return '刚刚';
+    if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+    if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+    return Math.floor(s / 86400) + ' 天前';
+  }
+
+  /* ---------------- 存储读写 ---------------- */
+
+  // 读取出的数据做一次清洗，防止旧数据 / 手改数据把页面搞崩
+  function sanitizeDish(d) {
+    if (!d || typeof d !== 'object' || !d.name) return null;
+    return {
+      id: String(d.id || uid()),
+      name: String(d.name).slice(0, 24),
+      category: String(d.category || '其他').slice(0, 10) || '其他',
+      img: typeof d.img === 'string' ? d.img : '',
+      thumb: typeof d.thumb === 'string' ? d.thumb : '',
+      preset: !!d.preset
+    };
+  }
+  function load() {
+    var dishes = [];
+    var seeded = false;
+    try {
+      var raw = localStorage.getItem(LS_DISHES);
+      if (raw === null) {
+        // 首次打开：写入 5 道示例菜
+        dishes = PRESETS.map(function (p) {
+          return { id:p.id, name:p.name, category:p.category, img:p.img, thumb:p.thumb, preset:true };
+        });
+        seeded = true;
+        setTimeout(function () { toast('已为你准备 5 道示例菜，可随意删改', 'ok'); }, 600);
+      } else {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          arr.forEach(function (d) { var c = sanitizeDish(d); if (c) dishes.push(c); });
+        }
+      }
+    } catch (e) { console.warn('清单读取失败，已重置为空', e); }
+    state.dishes = dishes;
+
+    try {
+      var h = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
+      state.history = Array.isArray(h) ? h.filter(function (x) { return x && x.name; }).slice(0, MAX_HISTORY) : [];
+    } catch (e) { state.history = []; }
+
+    try {
+      var ex = JSON.parse(sessionStorage.getItem(SS_EXCLUDED) || '[]');
+      state.excluded = Array.isArray(ex) ? ex : [];
+    } catch (e) { state.excluded = []; }
+
+    // 排除列表里可能有已被删除的菜，清理一次
+    state.excluded = state.excluded.filter(function (id) {
+      return state.dishes.some(function (d) { return d.id === id; });
+    });
+
+    saveTheme(readTheme(), true);
+    // 首次的示例菜要立刻落盘：否则用量计数为 0，且用户未做任何操作就关页时不持久
+    if (seeded) save();
+  }
+
+  // 返回 true 表示写入成功；空间不足会返回 false 并提示
+  function save() {
+    try {
+      localStorage.setItem(LS_DISHES, JSON.stringify(state.dishes));
+      localStorage.setItem(LS_HISTORY, JSON.stringify(state.history));
+    } catch (e) {
+      toast('本地存储空间不足，图片太多啦。可以删掉一些图片，或改用「粘贴图片链接」', 'err');
+      return false;
+    }
+    try { sessionStorage.setItem(SS_EXCLUDED, JSON.stringify(state.excluded)); } catch (e) {}
+    renderStorage();
+    return true;
+  }
+
+  function storageBytes() {
+    var n = 0;
+    [LS_DISHES, LS_HISTORY].forEach(function (k) {
+      var v = localStorage.getItem(k);
+      if (v) n += (k.length + v.length) * 2;   // localStorage 按 UTF-16 计
+    });
+    return n;
+  }
+  function fmtSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  /* ---------------- 主题 ---------------- */
+
+  function readTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(LS_THEME); } catch (e) {}
+    if (saved === 'dark' || saved === 'light') return saved;
+    var prefersDark = false;
+    try { prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) {}
+    return prefersDark ? 'dark' : 'light';
+  }
+  function saveTheme(theme, silent) {
+    document.documentElement.setAttribute('data-theme', theme);
+    el.themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    var meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0e1014' : '#ff6a3d');
+    try { localStorage.setItem(LS_THEME, theme); } catch (e) {}
+    if (!silent) renderGrid();   // 兜底色块的颜色跟主题相关，需要重画
+  }
+
+  /* ---------------- 渲染 ---------------- */
+
+  function visibleDishes() {
+    var kw = state.keyword.trim().toLowerCase();
+    return state.dishes.filter(function (d) {
+      if (state.filterCat !== 'ALL' && d.category !== state.filterCat) return false;
+      if (kw && d.name.toLowerCase().indexOf(kw) === -1) return false;
+      return true;
+    });
+  }
+
+  function renderGrid() {
+    el.dishCount.textContent = state.dishes.length + ' 道';
+    var list = visibleDishes();
+
+    el.empty.classList.toggle('hidden', state.dishes.length > 0);
+    el.grid.classList.toggle('hidden', state.dishes.length === 0);
+
+    if (state.dishes.length === 0) { el.grid.innerHTML = ''; return; }
+
+    if (list.length === 0) {
+      el.grid.innerHTML = '<p class="muted" style="grid-column:1/-1;text-align:center;padding:26px 0;font-size:13px">' +
+        '没有匹配的食物，换个关键词或类别试试</p>';
+      return;
+    }
+
+    el.grid.innerHTML = list.map(function (d) {
+      return '' +
+      '<article class="card" data-id="' + escapeHtml(d.id) + '">' +
+        '<div class="card-media">' +
+          '<img alt="' + escapeHtml(d.name) + '" data-img="' + escapeHtml(d.id) + '">' +
+          '<div class="fallback hidden" data-fb="' + escapeHtml(d.id) + '"></div>' +
+          (d.preset ? '<span class="badge-preset">示例</span>' : '') +
+        '</div>' +
+        '<button class="card-del" data-del="' + escapeHtml(d.id) + '" title="删除" aria-label="删除 ' + escapeHtml(d.name) + '">🗑</button>' +
+        '<div class="card-body">' +
+          '<div class="card-name">' + escapeHtml(d.name) + '</div>' +
+          '<span class="card-cat">' + escapeHtml(d.category) + '</span>' +
+        '</div>' +
+      '</article>';
+    }).join('');
+
+    // 图片单独挂载（用缩略图，省内存）。用 dataset 比对而不是拼选择器，避开特殊字符
+    var imgNodes = el.grid.querySelectorAll('img[data-img]');
+    var fbNodes  = el.grid.querySelectorAll('[data-fb]');
+    var byId = {};
+    list.forEach(function (d) { byId[d.id] = d; });
+    Array.prototype.forEach.call(imgNodes, function (img) {
+      var d = byId[(img.dataset && img.dataset.img) || img.getAttribute('data-img')];
+      if (!d) return;
+      var fb = null;
+      Array.prototype.some.call(fbNodes, function (n) {
+        if (((n.dataset && n.dataset.fb) || n.getAttribute('data-fb')) === d.id) { fb = n; return true; }
+        return false;
+      });
+      if (fb) setMedia(img, fb, d, true);
+    });
+  }
+
+  function renderCatChips() {
+    var counts = {};
+    state.dishes.forEach(function (d) { counts[d.category] = (counts[d.category] || 0) + 1; });
+    var cats = Object.keys(counts).sort();
+    var html = '<button class="cat-chip' + (state.filterCat === 'ALL' ? ' active' : '') + '" data-cat="ALL">全部 ' +
+      state.dishes.length + '</button>';
+    cats.forEach(function (c) {
+      html += '<button class="cat-chip' + (state.filterCat === c ? ' active' : '') + '" data-cat="' + escapeHtml(c) + '">' +
+        escapeHtml(c) + ' ' + counts[c] + '</button>';
+    });
+    el.catChips.innerHTML = html;
+  }
+
+  function renderHistory() {
+    if (!state.history.length) {
+      el.history.innerHTML = '<span class="muted" style="font-size:12.5px">还没有记录，先抽一次吧</span>';
+      return;
+    }
+    el.history.innerHTML = state.history.map(function (h) {
+      var src = h.img || '';
+      return '' +
+      '<div class="hist-item" title="' + escapeHtml(h.name) + ' · ' + relTime(h.t) + '">' +
+        '<div class="hi-img">' +
+          (src ? '<img src="' + escapeHtml(src) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+        '</div>' +
+        '<div><b>' + escapeHtml(h.name) + '</b><small>' + relTime(h.t) + '</small></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderExcluded() {
+    if (!state.excluded.length) { el.excludedBar.classList.add('hidden'); return; }
+    el.excludedBar.classList.remove('hidden');
+    el.excludedList.innerHTML = state.excluded.map(function (id) {
+      var d = state.dishes.find(function (x) { return x.id === id; });
+      if (!d) return '';
+      return '<span class="chip">' + escapeHtml(d.name) +
+        ' <button data-unex="' + escapeHtml(id) + '" title="恢复" style="color:var(--muted)">✕</button></span>';
+    }).join('');
+  }
+
+  function renderPool() {
+    var pool = state.dishes.filter(function (d) { return state.excluded.indexOf(d.id) === -1; });
+    el.poolCounter.textContent = '可选 ' + pool.length + ' 道';
+    var bits = [];
+    bits.push(state.dishes.length + ' 道食物');
+    if (state.excluded.length) bits.push('已排除 ' + state.excluded.length + ' 道');
+    if (state.history.length) bits.push('最近抽过 ' + state.history.length + ' 次');
+    el.pickerTip.textContent = state.dishes.length
+      ? bits.join(' · ') + ' · 最近 ' + RECENT_BLOCK + ' 次抽到过的会降权'
+      : '还没有食物，先去下面的清单添加吧';
+    // 只在动画进行中禁用；清单为空时保持可点，点了会给出解释而不是一个死按钮
+    el.rollBtn.disabled = spinning;
+  }
+
+  function renderStorage() {
+    var bytes = storageBytes();
+    var ratio = clamp(bytes / STORAGE_LIMIT, 0, 1);
+    el.storageFill.style.width = (ratio * 100).toFixed(1) + '%';
+    el.storageBar.classList.toggle('warn', ratio >= WARN_RATIO);
+    var txt = '本地已用 ' + fmtSize(bytes) + '（浏览器上限约 5MB）';
+    if (ratio >= WARN_RATIO) {
+      txt += ' · 快满了：建议删掉一些带图片的菜，或改用「粘贴图片链接」';
+    } else {
+      txt += ' · 清单只存在本机浏览器，不会上传';
+    }
+    el.storageText.textContent = txt;
+  }
+
+  // 结果里那道菜被删掉 / 被清空后，旧的结果卡片就不应该继续挂在那里
+  function dropStaleResult() {
+    var id = el.result.dataset.currentId;
+    if (!id) return;
+    var alive = state.dishes.some(function (d) { return d.id === id; });
+    if (alive) return;
+    el.result.classList.add('hidden');
+    el.result.classList.remove('show');
+    delete el.result.dataset.currentId;
+  }
+
+  function renderAll() {
+    dropStaleResult();
+    renderCatChips();
+    renderGrid();
+    renderHistory();
+    renderExcluded();
+    renderPool();
+    renderStorage();
+    renderQuickCats();
+  }
+
+  function renderQuickCats() {
+    var cats = {};
+    state.dishes.forEach(function (d) { cats[d.category] = 1; });
+    SUGGEST_CATS.forEach(function (c) { cats[c] = 1; });
+    var names = Object.keys(cats);
+    el.catOptions.innerHTML = names.map(function (c) {
+      return '<option value="' + escapeHtml(c) + '"></option>';
+    }).join('');
+    el.quickCats.innerHTML = SUGGEST_CATS.slice(0, 6).map(function (c) {
+      return '<button type="button" data-qc="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>';
+    }).join('');
+  }
+
+  /* ---------------- 增删 ---------------- */
+
+  function addDish(dish) {
+    var d = sanitizeDish(dish);
+    if (!d) return false;
+    state.dishes.push(d);
+    if (!save()) {
+      state.dishes.pop();          // 存不下就回滚，避免内存和磁盘不一致
+      renderAll();
+      return false;
+    }
+    renderAll();
+    return true;
+  }
+
+  function deleteDish(id) {
+    var idx = state.dishes.findIndex(function (d) { return d.id === id; });
+    if (idx === -1) return;
+    state.dishes.splice(idx, 1);
+    state.excluded = state.excluded.filter(function (x) { return x !== id; });
+    save();
+    renderAll();
+    toast('已删除');
+  }
+
+  /* ---------------- 随机抽取 ---------------- */
+
+  // 抽取核心：排除本次已移除的 → 最近 N 次抽到过的降权（有不重复的候选就优先）
+  function pickRandom() {
+    var pool = state.dishes.filter(function (d) { return state.excluded.indexOf(d.id) === -1; });
+    if (!pool.length) return null;
+    var recent = state.history.slice(0, RECENT_BLOCK).map(function (h) { return h.id; });
+    var fresh = pool.filter(function (d) { return recent.indexOf(d.id) === -1; });
+    var cand = fresh.length ? fresh : pool;
+    return cand[Math.floor(Math.random() * cand.length)];
+  }
+
+  function pushHistory(dish) {
+    var last = state.history[0];
+    if (last && last.id === dish.id) { last.t = Date.now(); return; }  // 连着抽到同一道不重复记
+    state.history.unshift({
+      id: dish.id,
+      name: dish.name,
+      category: dish.category,
+      // 只存 http 图（本地 base64 图不写进历史，避免重复占用存储）
+      img: /^https?:/i.test(dish.thumb || '') ? dish.thumb : (/^https?:/i.test(dish.img || '') ? dish.img : ''),
+      t: Date.now()
+    });
+    if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
+  }
+
+  function showResult(dish) {
+    el.result.dataset.currentId = dish.id;   // 「换一批」要读这个 id
+    el.result.classList.remove('hidden');
+    setMedia(el.resultImg, el.resultFallback, dish, false);
+    el.resultName.textContent = dish.name;
+    el.resultCat.textContent = dish.category;
+    // 强制回流后再加 .show，保证过渡动画生效
+    void el.result.offsetWidth;
+    el.result.classList.add('show');
+  }
+
+  // 转盘动画：先快后慢（easeOutQuart），不做瞬间出结果
+  function spin(target, done) {
+    var pool = state.dishes.filter(function (d) { return state.excluded.indexOf(d.id) === -1; });
+
+    // 拼出滚动序列：随机循环若干组，最后一行放真正的结果
+    var rows = [];
+    if (pool.length < 2) {
+      rows = [target, target, target, target];
+    } else {
+      var guard = 0;
+      while (rows.length < 10 && guard++ < 20) rows = rows.concat(shuffle(pool));
+      if (rows.length > 1 && rows[rows.length - 1].id === target.id) rows.pop();
+    }
+    // 去掉结果前面紧挨着的同一道菜，避免「连着两行一样」的观感
+    while (rows.length && rows[rows.length - 1].id === target.id) rows.pop();
+    rows.push(target);
+    // 顶部再垫一行，保证高亮带上方不空着
+    var startIdx = 0;
+    if (rows.length >= 3) { rows.unshift(shuffle(pool)[0] || target); startIdx = 1; }
+
+    el.wheel.innerHTML = rows.map(function (d) {
+      return '' +
+      '<div class="wheel-row">' +
+        '<div class="wr-thumb"><img alt=""></div>' +
+        '<div class="wr-text"><b>' + escapeHtml(d.name) + '</b><span>' + escapeHtml(d.category) + '</span></div>' +
+      '</div>';
+    }).join('');
+
+    el.wheelWrap.classList.remove('hidden');
+    el.result.classList.add('hidden');
+    el.result.classList.remove('show');
+
+    var rowH = parseFloat(getComputedStyle(el.wheelWrap).getPropertyValue('--row')) || 84;
+    var last = rows.length - 1;
+    var from = rowH * (1 - startIdx);     // 起始：startIdx 行停在中间高亮带
+    var to   = rowH * (1 - last);         // 结束：最后一行（结果）停在中间
+    var dur  = clamp(1700 + rows.length * 60, 1700, 3200);
+
+    // 转盘缩略图（用缩略图，避免 base64 大图重复解码）
+    var imgs = el.wheel.querySelectorAll('.wr-thumb img');
+    rows.forEach(function (d, i) {
+      var box = imgs[i] ? imgs[i].parentNode : null;
+      if (!imgs[i]) return;
+      var src = d.thumb || d.img;
+      if (src) { imgs[i].src = src; }
+      else {
+        imgs[i].style.display = 'none';
+        box.style.display = 'grid';
+        box.style.placeItems = 'center';
+        box.style.fontWeight = '800';
+        box.style.fontSize = '13px';
+        paintFallback(box, d.name);
+      }
+    });
+
+    el.wheel.style.transition = 'none';
+    el.wheel.style.transform = 'translate3d(0,' + from + 'px,0)';
+
+    var start = null;
+    function frame(now) {
+      if (start === null) start = now;
+      var t = clamp((now - start) / dur, 0, 1);
+      var e = 1 - Math.pow(1 - t, 4);              // easeOutQuart：先快后慢
+      var y = from + (to - from) * e;
+      el.wheel.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
+      // 速度越快越糊，停下时自动恢复清晰
+      var speed = Math.abs((to - from) * 4 * Math.pow(1 - t, 3) / dur) * 1000;
+      el.wheel.style.filter = speed > 2200 ? 'blur(' + Math.min(3.2, (speed - 2200) / 1000).toFixed(2) + 'px)' : 'none';
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        el.wheel.style.transform = 'translate3d(0,' + to + 'px,0)';
+        el.wheel.style.filter = 'none';
+        setTimeout(function () {
+          el.wheelWrap.classList.add('hidden');
+          showResult(target);
+          if (done) done();
+        }, 220);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function doRoll(opts) {
+    opts = opts || {};
+    if (spinning) return;
+
+    var pool = state.dishes.filter(function (d) { return state.excluded.indexOf(d.id) === -1; });
+    if (state.dishes.length === 0) {
+      toast('清单是空的，先添加一道菜吧', 'err');
+      el.empty.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (pool.length === 0) {
+      toast('所有菜都被你换掉了，点「全部恢复」再来', 'err');
+      return;
+    }
+
+    // 「换一批」：把当前结果临时移出本次抽取
+    if (opts.excludeCurrent && opts.currentId) {
+      if (state.dishes.length <= state.excluded.length + 1) {
+        toast('只剩这一道了，先不加就抽它吧', 'err');
+        return;
+      }
+      if (state.excluded.indexOf(opts.currentId) === -1) state.excluded.push(opts.currentId);
+      save();
+      renderExcluded();
+      renderPool();
+      pool = state.dishes.filter(function (d) { return state.excluded.indexOf(d.id) === -1; });
+      if (!pool.length) { toast('全部被排除了，点「全部恢复」', 'err'); return; }
+    }
+
+    var target = pickRandom();
+    if (!target) return;
+
+    spinning = true;
+    el.rollBtn.disabled = true;
+    el.swapBtn.disabled = true;
+    el.rollBtn.innerHTML = '<span>🎲</span> 正在抽…';
+
+    spin(target, function () {
+      pushHistory(target);
+      save();
+      renderHistory();
+      renderPool();
+      spinning = false;
+      el.rollBtn.disabled = false;
+      el.swapBtn.disabled = false;
+      el.rollBtn.innerHTML = '<span>🎲</span> 随机一餐';
+      // 结果卡片在视口外的话滚过去看一眼
+      try {
+        var r = el.result.getBoundingClientRect();
+        if (r.top < 60 || r.bottom > window.innerHeight) {
+          el.result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } catch (e) {}
+    });
+  }
+
+  /* ---------------- 图片处理 ---------------- */
+
+  // 读文件 → canvas 等比缩放 → 输出 JPEG base64。返回 {img, thumb, bytes}
+  function processImage(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) return reject(new Error('请选择图片文件'));
+      if (file.size > 10 * 1024 * 1024) return reject(new Error('图片太大了（超过 10MB）'));
+
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('读取文件失败')); };
+      reader.onload = function () {
+        var raw = reader.result;
+        var im = new Image();
+        im.onerror = function () { reject(new Error('图片解析失败，换一张试试')); };
+        im.onload = function () {
+          try {
+            function resize(maxSide, quality) {
+              var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+              var scale = Math.min(1, maxSide / Math.max(w, h));
+              var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+              var cv = document.createElement('canvas');
+              cv.width = cw; cv.height = ch;
+              var ctx = cv.getContext('2d');
+              ctx.fillStyle = '#fff';
+              ctx.fillRect(0, 0, cw, ch);      // 透明底转白，避免 JPEG 变黑
+              ctx.drawImage(im, 0, 0, cw, ch);
+              return cv.toDataURL('image/jpeg', quality);
+            }
+            var main  = resize(IMG_MAX_SIDE, 0.82);
+            var thumb = resize(THUMB_MAX_SIDE, 0.72);
+            // 压缩反而变大（比如原图本来就很小）就用原图
+            if (main.length > raw.length) main = raw;
+            resolve({ img: main, thumb: thumb, bytes: main.length });
+          } catch (e) {
+            // canvas 不可用（极少数环境）时退回原始 dataURL
+            resolve({ img: raw, thumb: raw, bytes: raw.length });
+          }
+        };
+        im.src = raw;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function dataUrlBytes(dataUrl) {
+    var i = dataUrl.indexOf(',');
+    if (i === -1) return 0;
+    return Math.round((dataUrl.length - i - 1) * 0.75);
+  }
+
+  /* ---------------- 添加表单 ---------------- */
+
+  var form = { img: '', thumb: '', tab: 'file' };
+
+  function resetForm() {
+    form = { img: '', thumb: '', tab: 'file' };
+    el.fName.value = '';
+    el.fCat.value = '';
+    el.fUrl.value = '';
+    el.fFile.value = '';
+    el.errName.textContent = '';
+    el.fName.classList.remove('invalid');
+    setPreview();
+    document.querySelectorAll('#addModal .tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === 'file');
+    });
+    document.querySelectorAll('#addModal .tab-pane').forEach(function (p) {
+      p.classList.toggle('hidden', p.dataset.pane !== 'file');
+    });
+  }
+
+  function setPreview() {
+    var name = el.fName.value.trim();
+    if (form.img || form.thumb) {
+      el.previewFallback.classList.add('hidden');
+      el.previewImg.classList.remove('hidden');
+      el.previewImg.onerror = function () {
+        el.previewImg.classList.add('hidden');
+        el.previewFallback.classList.remove('hidden');
+        paintFallback(el.previewFallback, name || '?');
+      };
+      el.previewImg.src = form.thumb || form.img;
+      var isData = /^data:/.test(form.img);
+      el.previewMeta.textContent = isData
+        ? '已选本地图片 · 存进本地约 ' + fmtSize(dataUrlBytes(form.img))
+        : '已使用图片链接（不占本地空间）';
+      el.clearImg.classList.remove('hidden');
+    } else {
+      el.previewImg.removeAttribute('src');
+      el.previewImg.classList.add('hidden');
+      el.previewFallback.classList.remove('hidden');
+      paintFallback(el.previewFallback, name || '?');
+      el.previewMeta.textContent = '还没有选择图片，将使用菜名生成的色块占位';
+      el.clearImg.classList.add('hidden');
+    }
+  }
+
+  function openAdd() {
+    resetForm();
+    el.addModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () { try { el.fName.focus(); } catch (e) {} }, 60);
+  }
+  function closeAdd() {
+    el.addModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  function saveFromForm() {
+    var name = el.fName.value.trim();
+    if (!name) {
+      el.errName.textContent = '菜名不能为空';
+      el.fName.classList.add('invalid');
+      el.fName.focus();
+      return;
+    }
+    if (state.dishes.some(function (d) { return d.name === name; })) {
+      el.errName.textContent = '清单里已经有同名菜了（也可以继续添加）';
+    } else {
+      el.errName.textContent = '';
+    }
+    el.fName.classList.remove('invalid');
+
+    var cat = el.fCat.value.trim() || '其他';
+    var dish = {
+      id: uid(), name: name, category: cat,
+      img: form.img, thumb: form.thumb || form.img, preset: false
+    };
+    if (addDish(dish)) {
+      closeAdd();
+      var kb = form.img && /^data:/.test(form.img) ? dataUrlBytes(form.img) : 0;
+      toast(kb ? '已添加「' + name + '」，占用约 ' + fmtSize(kb) : '已添加「' + name + '」', 'ok');
+      if (kb > 500 * 1024) toast('这张图偏大，清单快满时建议改用图片链接', 'err');
+      renderCatChips();
+      renderGrid();
+    }
+  }
+
+  /* ---------------- 确认弹窗 ---------------- */
+
+  var confirmResolve = null;
+  function confirmDlg(title, msg, okText) {
+    el.cfTitle.textContent = title;
+    el.cfMsg.textContent = msg;
+    el.cfYes.textContent = okText || '确认';
+    el.confirmModal.classList.remove('hidden');
+    return new Promise(function (res) { confirmResolve = res; });
+  }
+  function closeConfirm(val) {
+    el.confirmModal.classList.add('hidden');
+    if (confirmResolve) { confirmResolve(val); confirmResolve = null; }
+  }
+
+  /* ---------------- 导入 / 导出 ---------------- */
+
+  function exportJSON() {
+    var data = {
+      app: '随机吃什么',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      dishes: state.dishes,
+      history: state.history
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var d = new Date();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    a.href = url;
+    a.download = '随机吃什么-清单-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('清单已导出', 'ok');
+  }
+
+  function importJSON(text) {
+    var data;
+    try { data = JSON.parse(text); } catch (e) { toast('文件格式不对：不是合法 JSON', 'err'); return; }
+    var arr = data && (Array.isArray(data) ? data : data.dishes);
+    if (!Array.isArray(arr)) { toast('没找到清单数据（需要用本工具导出的文件）', 'err'); return; }
+
+    var incoming = [];
+    arr.forEach(function (d) { var c = sanitizeDish(d); if (c) incoming.push(c); });
+    if (!incoming.length) { toast('文件里没有可导入的食物', 'err'); return; }
+
+    confirmDlg(
+      '导入清单',
+      '文件里有 ' + incoming.length + ' 道食物，将追加到现有清单（同 ID 自动跳过）。当前有 ' + state.dishes.length + ' 道。',
+      '确认导入'
+    ).then(function (ok) {
+      if (!ok) return;
+      var exist = {};
+      state.dishes.forEach(function (d) { exist[d.id] = 1; });
+      var added = 0;
+      incoming.forEach(function (d) {
+        if (exist[d.id]) return;   // 同 ID 视为同一道菜，跳过
+        exist[d.id] = 1;
+        d.preset = false;
+        state.dishes.push(d);
+        added++;
+      });
+      if (!save()) {
+        // 存不下：回滚到导入前
+        state.dishes = state.dishes.slice(0, state.dishes.length - added);
+        renderAll();
+        return;
+      }
+      renderAll();
+      toast('已导入 ' + added + ' 道食物' + (added < incoming.length ? '（其余重复已跳过）' : ''), 'ok');
+    });
+  }
+
+  /* ---------------- 事件绑定 ---------------- */
+
+  function bind() {
+    // 主题
+    el.themeBtn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      saveTheme(next);
+      setPreview();
+    });
+
+    // 抽取
+    el.rollBtn.addEventListener('click', function () { doRoll(); });
+    el.swapBtn.addEventListener('click', function () {
+      doRoll({ excludeCurrent: true, currentId: el.result.dataset.currentId });
+    });
+
+    // 排除项恢复
+    el.excludedList.addEventListener('click', function (e) {
+      var id = e.target.dataset && e.target.dataset.unex;
+      if (!id) return;
+      state.excluded = state.excluded.filter(function (x) { return x !== id; });
+      save(); renderExcluded(); renderPool();
+    });
+    el.restoreAll.addEventListener('click', function () {
+      state.excluded = [];
+      save(); renderExcluded(); renderPool();
+      toast('已恢复全部食物', 'ok');
+    });
+
+    // 清单：筛选 / 搜索
+    el.catChips.addEventListener('click', function (e) {
+      var cat = e.target.dataset && e.target.dataset.cat;
+      if (!cat) return;
+      state.filterCat = cat;
+      renderCatChips(); renderGrid();
+    });
+    el.searchInput.addEventListener('input', function () {
+      state.keyword = el.searchInput.value;
+      renderGrid();
+    });
+
+    // 清单：删除
+    el.grid.addEventListener('click', function (e) {
+      var id = e.target.dataset && e.target.dataset.del;
+      if (!id) return;
+      var d = state.dishes.find(function (x) { return x.id === id; });
+      if (!d) return;
+      confirmDlg('删除「' + d.name + '」？', '删除后这道菜不会再出现在抽取结果里。', '删除').then(function (ok) {
+        if (ok) deleteDish(id);
+      });
+    });
+
+    // 添加
+    el.openAdd.addEventListener('click', openAdd);
+    el.emptyAdd.addEventListener('click', openAdd);
+    el.restorePresets.addEventListener('click', function () {
+      var exist = {};
+      state.dishes.forEach(function (d) { exist[d.id] = 1; });
+      var n = 0;
+      PRESETS.forEach(function (p) {
+        if (exist[p.id]) return;
+        state.dishes.push({ id:p.id, name:p.name, category:p.category, img:p.img, thumb:p.thumb, preset:true });
+        n++;
+      });
+      if (!n) { toast('示例菜已经在清单里了'); return; }
+      save(); renderAll();
+      toast('已恢复 ' + n + ' 道示例菜', 'ok');
+    });
+
+    // 弹窗关闭
+    el.addModal.addEventListener('click', function (e) {
+      if (e.target.hasAttribute('data-close')) closeAdd();
+    });
+    el.confirmModal.addEventListener('click', function (e) {
+      if (e.target.hasAttribute('data-close')) closeConfirm(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!el.confirmModal.classList.contains('hidden')) closeConfirm(false);
+      else if (!el.addModal.classList.contains('hidden')) closeAdd();
+    });
+
+    // 表单：tab 切换
+    document.querySelectorAll('#addModal .tab').forEach(function (t) {
+      t.addEventListener('click', function () {
+        form.tab = t.dataset.tab;
+        document.querySelectorAll('#addModal .tab').forEach(function (x) {
+          x.classList.toggle('active', x === t);
+        });
+        document.querySelectorAll('#addModal .tab-pane').forEach(function (p) {
+          p.classList.toggle('hidden', p.dataset.pane !== form.tab);
+        });
+      });
+    });
+
+    // 表单：菜名联动预览
+    el.fName.addEventListener('input', function () {
+      el.errName.textContent = '';
+      el.fName.classList.remove('invalid');
+      setPreview();
+    });
+    // 表单：快捷类别
+    el.quickCats.addEventListener('click', function (e) {
+      var c = e.target.dataset && e.target.dataset.qc;
+      if (c) el.fCat.value = c;
+    });
+
+    // 表单：本地图片
+    el.fFile.addEventListener('change', function () {
+      var f = el.fFile.files && el.fFile.files[0];
+      if (!f) return;
+      el.previewMeta.textContent = '正在压缩图片…';
+      processImage(f).then(function (r) {
+        form.img = r.img; form.thumb = r.thumb;
+        setPreview();
+        if (r.bytes > 700 * 1024) toast('这张图压缩后仍有 ' + fmtSize(r.bytes) + '，建议换小图或改用链接', 'err');
+      }).catch(function (err) {
+        el.previewMeta.textContent = '图片处理失败';
+        toast(err.message || '图片处理失败', 'err');
+        el.fFile.value = '';
+      });
+    });
+
+    // 表单：拖拽上传
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      el.dropzone.addEventListener(ev, function (e) { e.preventDefault(); el.dropzone.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      el.dropzone.addEventListener(ev, function (e) { e.preventDefault(); el.dropzone.classList.remove('over'); });
+    });
+    el.dropzone.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      el.previewMeta.textContent = '正在压缩图片…';
+      processImage(f).then(function (r) {
+        form.img = r.img; form.thumb = r.thumb; setPreview();
+      }).catch(function (err) { toast(err.message || '图片处理失败', 'err'); });
+    });
+
+    // 表单：图片链接
+    el.fUrl.addEventListener('input', function () {
+      var u = el.fUrl.value.trim();
+      if (!u) { form.img = ''; form.thumb = ''; setPreview(); return; }
+      if (!/^(https?:\/\/|data:image\/)/i.test(u)) {
+        el.previewMeta.textContent = '链接需以 http(s):// 开头';
+        return;
+      }
+      form.img = u; form.thumb = u;
+      setPreview();
+    });
+
+    el.clearImg.addEventListener('click', function () {
+      form.img = ''; form.thumb = ''; el.fFile.value = ''; el.fUrl.value = '';
+      setPreview();
+    });
+    el.saveDish.addEventListener('click', saveFromForm);
+    el.fName.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveFromForm(); });
+
+    // 导入导出 / 清空
+    el.exportBtn.addEventListener('click', exportJSON);
+    el.importBtn.addEventListener('click', function () { el.importFile.click(); });
+    el.importFile.addEventListener('change', function () {
+      var f = el.importFile.files && el.importFile.files[0];
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () { importJSON(String(rd.result)); };
+      rd.onerror = function () { toast('文件读取失败', 'err'); };
+      rd.readAsText(f, 'utf-8');
+      el.importFile.value = '';
+    });
+    el.clearBtn.addEventListener('click', function () {
+      if (!state.dishes.length) { toast('清单已经是空的了'); return; }
+      confirmDlg('清空全部 ' + state.dishes.length + ' 道食物？',
+        '含你自己上传的图片，删除后无法恢复。建议先「导出清单」做个备份。', '清空').then(function (ok) {
+        if (!ok) return;
+        state.dishes = []; state.excluded = [];
+        save(); renderAll();
+        toast('清单已清空', 'ok');
+      });
+    });
+
+    // 确认弹窗按钮
+    el.cfYes.addEventListener('click', function () { closeConfirm(true); });
+    el.cfNo.addEventListener('click', function () { closeConfirm(false); });
+  }
+
+  /* ---------------- 直接暴露给调试 / 自动化测试 ---------------- */
+  window.__RMCE__ = {
+    state: state,
+    PRESETS: PRESETS,
+    pickRandom: pickRandom,
+    addDish: addDish,
+    deleteDish: deleteDish,
+    visibleDishes: visibleDishes,
+    storageBytes: storageBytes,
+    sanitizeDish: sanitizeDish,
+    processImage: processImage,
+    importJSON: importJSON,
+    doRoll: doRoll,
+    hueOf: hueOf,
+    fmtSize: fmtSize,
+    save: save,
+    renderAll: renderAll,
+    setExcluded: function (ids) { state.excluded = ids.slice(); save(); renderAll(); }
+  };
+
+  /* ---------------- 启动 ---------------- */
+  function init() {
+    load();
+    bind();
+    renderAll();
+    // 历史里的相对时间过一会儿会变旧，定期刷新一下
+    setInterval(renderHistory, 60000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
